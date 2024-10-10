@@ -1,0 +1,124 @@
+{
+  "preamble": {
+    "title": "strike-finance/staking",
+    "description": "Aiken contracts for project 'strike-finance/staking'",
+    "version": "0.0.0",
+    "plutusVersion": "v3",
+    "compiler": {
+      "name": "Aiken",
+      "version": "v1.1.3+3d77b5c"
+    },
+    "license": "Apache-2.0"
+  },
+  "validators": [
+    {
+      "title": "staking.staking.spend",
+      "datum": {
+        "title": "datum",
+        "schema": {
+          "$ref": "#/definitions/types~1StakingDatum"
+        }
+      },
+      "redeemer": {
+        "title": "rdmr",
+        "schema": {
+          "$ref": "#/definitions/Int"
+        }
+      },
+      "compiledCode": "588f01010032323232322533300232323232323253330083370e900100089919191931bad006300d300e002300c001300a37540042a66601066e1d2004001132326375a008601660146ea800854ccc020cdc3a400000226464c6eb4010dd7180598051baa00216300837540026012601400460100026010004600c00260086ea8004526136565734aae7555cf2ba157441",
+      "hash": "b2ed8fbe1c438f4570aa34060fd761fbdb4d9e3564b6de37863fea36"
+    },
+    {
+      "title": "staking.staking.withdraw",
+      "redeemer": {
+        "title": "_redmr",
+        "schema": {
+          "$ref": "#/definitions/Int"
+        }
+      },
+      "compiledCode": "588f01010032323232322533300232323232323253330083370e900100089919191931bad006300d300e002300c001300a37540042a66601066e1d2004001132326375a008601660146ea800854ccc020cdc3a400000226464c6eb4010dd7180598051baa00216300837540026012601400460100026010004600c00260086ea8004526136565734aae7555cf2ba157441",
+      "hash": "b2ed8fbe1c438f4570aa34060fd761fbdb4d9e3564b6de37863fea36"
+    },
+    {
+      "title": "staking.staking.mint",
+      "redeemer": {
+        "title": "_redmr",
+        "schema": {
+          "$ref": "#/definitions/Int"
+        }
+      },
+      "compiledCode": "588f01010032323232322533300232323232323253330083370e900100089919191931bad006300d300e002300c001300a37540042a66601066e1d2004001132326375a008601660146ea800854ccc020cdc3a400000226464c6eb4010dd7180598051baa00216300837540026012601400460100026010004600c00260086ea8004526136565734aae7555cf2ba157441",
+      "hash": "b2ed8fbe1c438f4570aa34060fd761fbdb4d9e3564b6de37863fea36"
+    },
+    {
+      "title": "staking.staking.else",
+      "compiledCode": "588f01010032323232322533300232323232323253330083370e900100089919191931bad006300d300e002300c001300a37540042a66601066e1d2004001132326375a008601660146ea800854ccc020cdc3a400000226464c6eb4010dd7180598051baa00216300837540026012601400460100026010004600c00260086ea8004526136565734aae7555cf2ba157441",
+      "hash": "b2ed8fbe1c438f4570aa34060fd761fbdb4d9e3564b6de37863fea36"
+    }
+  ],
+  "definitions": {
+    "AddressHash": {
+      "title": "AddressHash",
+      "dataType": "bytes"
+    },
+    "AssetName": {
+      "title": "AssetName",
+      "dataType": "bytes"
+    },
+    "Int": {
+      "dataType": "integer"
+    },
+    "POSIXTime": {
+      "title": "POSIXTime",
+      "dataType": "integer"
+    },
+    "PolicyId": {
+      "title": "PolicyId",
+      "dataType": "bytes"
+    },
+    "types/AssetClass": {
+      "title": "AssetClass",
+      "anyOf": [
+        {
+          "title": "AssetClass",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "policy_id",
+              "$ref": "#/definitions/PolicyId"
+            },
+            {
+              "title": "asset_name",
+              "$ref": "#/definitions/AssetName"
+            }
+          ]
+        }
+      ]
+    },
+    "types/StakingDatum": {
+      "title": "StakingDatum",
+      "anyOf": [
+        {
+          "title": "StakingDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "owner_address_hash",
+              "$ref": "#/definitions/AddressHash"
+            },
+            {
+              "title": "strike_asset",
+              "$ref": "#/definitions/types~1AssetClass"
+            },
+            {
+              "title": "last_rewarded_time",
+              "$ref": "#/definitions/POSIXTime"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
