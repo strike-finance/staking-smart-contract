@@ -10,9 +10,14 @@ use types.{
   Burn, ConsumeStakingRewards, DistributeStakingRewards, Mint, MintRedeemer,
   StakingDatum, StakingRedeemer, WithdrawStake,
 }
-use utils.{get_address_outputs, get_validators_inputs, validate_token_mint}
+use utils.{
+  get_address_outputs, get_lower_bound, get_script_hash, get_validators_inputs,
+  validate_token_mint,
+}
 
 validator staking(
+  strike_policy_id: PolicyId,
+  strike_asset_name: ByteArray,
   strike_stake_credential: StakeCredential,
   asset_name: ByteArray,
 ) {
@@ -103,7 +108,54 @@ validator staking(
 
   mint(redeemer: MintRedeemer, policy_id: PolicyId, transaction: Transaction) {
     when redeemer is {
-      Mint -> todo
+      Mint -> {
+        let expected_minted = (policy_id, asset_name, 1)
+
+        let valid_mint = validate_token_mint(transaction.mint, expected_minted)
+
+        expect Some(output_to_forward_contract) =
+          list.find(
+            transaction.outputs,
+            fn(output) {
+              let minted_asset_quantity =
+                quantity_of(output.value, policy_id, asset_name)
+
+              minted_asset_quantity == 1
+            },
+          )
+
+        let output_script_hash =
+          get_script_hash(output_to_forward_contract.address)
+
+        let output_is_to_forward_validator = output_script_hash == policy_id
+
+        expect Some(output_to_collateral_stake_credential) =
+          output_to_forward_contract.address.stake_credential
+
+        let stake_credential_is_valid =
+          output_to_collateral_stake_credential == strike_stake_credential
+
+        expect InlineDatum(output_datum) = output_to_forward_contract.datum
+
+        expect output_datum_typed: StakingDatum = output_datum
+
+        let signed_by_owner =
+          list.has(
+            transaction.extra_signatories,
+            output_datum_typed.owner_address_hash,
+          )
+
+        let asset_is_valid =
+          output_datum_typed.staking_mint_asset.policy_id == policy_id && output_datum_typed.staking_mint_asset.asset_name == asset_name
+
+        let strike_asset_is_valid =
+          output_datum_typed.strike_asset.policy_id == strike_policy_id && output_datum_typed.strike_asset.asset_name == strike_asset_name
+
+        let last_rewarded_time_is_valid =
+          get_lower_bound(transaction.validity_range) > output_datum_typed.last_rewarded_time
+
+        signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && strike_asset_is_valid && last_rewarded_time_is_valid
+      }
       Burn -> {
         let expected_burnt = (policy_id, asset_name, -1)
 

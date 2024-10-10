@@ -1,8 +1,10 @@
 use aiken/collection/dict
 use aiken/collection/list
+use aiken/crypto.{ScriptHash}
+use aiken/interval.{Finite}
 use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId, Value, flatten, tokens}
-use cardano/transaction.{Input, Output, Transaction}
+use cardano/transaction.{Input, Output, Transaction, ValidityRange}
 
 pub fn get_address_outputs(
   transaction: Transaction,
@@ -42,4 +44,16 @@ fn only_one_token_in_policy_minted(mints, expected_minting) {
   // Check for the policy mints
   list.length(dict.keys(tokens(mints, policy_id))) == 1
   // Total count of minted unique tokens with policy is 1
+}
+
+pub fn get_script_hash(address: Address) -> ScriptHash {
+  when address.payment_credential is {
+    Script(validator_hash) -> validator_hash
+    _ -> fail
+  }
+}
+
+pub fn get_lower_bound(range: ValidityRange) -> Int {
+  expect Finite(lower_bound) = range.lower_bound.bound_type
+  lower_bound
 }
