@@ -1,11 +1,13 @@
 use aiken/collection/list
 use aiken/collection/pairs
-use cardano/address.{StakeCredential}
+use cardano/address.{Script, StakeCredential}
 use cardano/assets.{PolicyId, lovelace_of, quantity_of}
+use cardano/script_context.{ScriptContext, Withdrawing}
 use cardano/transaction.{
   InlineDatum, Output, OutputReference, Transaction, find_input,
 }
 use constants.{min_lovelace_in_utxo}
+use staking_utils.{valid_distribute_rewards, validation_logic}
 use types.{
   Burn, ConsumeStakingRewards, DistributeStakingRewards, Mint, MintRedeemer,
   StakingDatum, StakingRedeemer, WithdrawStake,
@@ -99,11 +101,20 @@ validator staking(
   }
 
   withdraw(
-    _redmr: Int,
-    _my_output_reference: OutputReference,
-    _self: Transaction,
+    redeemer: List<(Int, Int)>,
+    ctx: ScriptContext,
+    transaction: Transaction,
   ) {
-    todo
+    expect Withdrawing(stake_cred) = ctx.info
+
+    expect Script(own_validator) = stake_cred
+
+    valid_distribute_rewards(
+      validation_logic,
+      redeemer,
+      own_validator,
+      transaction,
+    )
   }
 
   mint(redeemer: MintRedeemer, policy_id: PolicyId, transaction: Transaction) {
