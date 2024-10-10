@@ -2,7 +2,6 @@ use aiken/collection/list
 use aiken/collection/pairs
 use cardano/address.{Credential, Script, StakeCredential}
 use cardano/assets.{PolicyId, lovelace_of, quantity_of}
-use cardano/script_context.{ScriptContext, Withdrawing}
 use cardano/transaction.{
   InlineDatum, Output, OutputReference, Transaction, find_input,
 }
