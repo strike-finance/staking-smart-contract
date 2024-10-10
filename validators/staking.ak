@@ -1,6 +1,6 @@
 use aiken/collection/list
 use aiken/collection/pairs
-use cardano/address.{Script, StakeCredential}
+use cardano/address.{Credential, Script, StakeCredential}
 use cardano/assets.{PolicyId, lovelace_of, quantity_of}
 use cardano/script_context.{ScriptContext, Withdrawing}
 use cardano/transaction.{
@@ -102,12 +102,10 @@ validator staking(
 
   withdraw(
     redeemer: List<(Int, Int)>,
-    ctx: ScriptContext,
+    credential: Credential,
     transaction: Transaction,
   ) {
-    expect Withdrawing(stake_cred) = ctx.info
-
-    expect Script(own_validator) = stake_cred
+    expect Script(own_validator) = credential
 
     valid_distribute_rewards(
       validation_logic,
