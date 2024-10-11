@@ -20,7 +20,7 @@ pub type StakingDatum {
 }
 
 pub type StakingRedeemer {
-  ConsumeStakingRewards
+  AddStakeOrConsumeStakingRewards
   WithdrawStake
   DistributeStakingRewards
 }

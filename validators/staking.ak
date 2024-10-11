@@ -9,8 +9,8 @@ use cardano/transaction.{
 use constants.{min_lovelace_in_utxo}
 use staking_utils.{valid_distribute_rewards, validation_logic}
 use types.{
-  Burn, ConsumeStakingRewards, DistributeStakingRewards, Mint, MintRedeemer,
-  StakingDatum, StakingRedeemer, WithdrawStake,
+  AddStakeOrConsumeStakingRewards, Burn, DistributeStakingRewards, Mint,
+  MintRedeemer, StakingDatum, StakingRedeemer, WithdrawStake,
 }
 use utils.{
   get_address_outputs, get_lower_bound, get_script_hash, get_validators_inputs,
@@ -29,7 +29,7 @@ validator staking(
     transaction: Transaction,
   ) {
     when rdmr is {
-      ConsumeStakingRewards -> {
+      AddStakeOrConsumeStakingRewards -> {
         expect Some(datum) = datum
         let signed_by_owner =
           list.has(transaction.extra_signatories, datum.owner_address_hash)
@@ -69,7 +69,18 @@ validator staking(
             datum.staking_mint_asset.asset_name,
           ) == 1
 
-        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && staking_mint_asset_returned
+        let strike_asset_returned =
+          quantity_of(
+            output_to_validator.value,
+            datum.strike_asset.policy_id,
+            datum.strike_asset.asset_name,
+          ) >= quantity_of(
+            input_from_validator.output.value,
+            datum.strike_asset.policy_id,
+            datum.strike_asset.asset_name,
+          )
+
+        strike_asset_returned && signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && staking_mint_asset_returned && strike_asset_returned
       }
       WithdrawStake -> {
         expect Some(datum) = datum
