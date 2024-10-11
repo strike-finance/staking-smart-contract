@@ -4,6 +4,7 @@ use cardano/address.{Credential, Script, StakeCredential}
 use cardano/assets.{PolicyId, lovelace_of, quantity_of}
 use cardano/transaction.{
   InlineDatum, Output, OutputReference, Transaction, find_input,
+  find_script_outputs,
 }
 use constants.{min_lovelace_in_utxo}
 use staking_utils.{valid_distribute_rewards, validation_logic}
@@ -20,7 +21,6 @@ validator staking(
   strike_policy_id: PolicyId,
   strike_asset_name: ByteArray,
   strike_stake_credential: StakeCredential,
-  asset_name: ByteArray,
 ) {
   spend(
     datum: Option<StakingDatum>,
@@ -117,20 +117,20 @@ validator staking(
   mint(redeemer: MintRedeemer, policy_id: PolicyId, transaction: Transaction) {
     when redeemer is {
       Mint -> {
-        let expected_minted = (policy_id, asset_name, 1)
-
-        let valid_mint = validate_token_mint(transaction.mint, expected_minted)
+        let outputs_to_forward_contract: List<Output> =
+          find_script_outputs(transaction.outputs, policy_id)
 
         expect Some(output_to_forward_contract) =
-          list.find(
-            transaction.outputs,
-            fn(output) {
-              let minted_asset_quantity =
-                quantity_of(output.value, policy_id, asset_name)
+          list.head(outputs_to_forward_contract)
 
-              minted_asset_quantity == 1
-            },
-          )
+        expect InlineDatum(output_datum) = output_to_forward_contract.datum
+
+        expect output_datum_typed: StakingDatum = output_datum
+
+        let expected_minted =
+          (policy_id, output_datum_typed.staking_mint_asset.asset_name, 1)
+
+        let valid_mint = validate_token_mint(transaction.mint, expected_minted)
 
         let output_script_hash =
           get_script_hash(output_to_forward_contract.address)
@@ -143,18 +143,17 @@ validator staking(
         let stake_credential_is_valid =
           output_to_collateral_stake_credential == strike_stake_credential
 
-        expect InlineDatum(output_datum) = output_to_forward_contract.datum
-
-        expect output_datum_typed: StakingDatum = output_datum
-
         let signed_by_owner =
           list.has(
             transaction.extra_signatories,
             output_datum_typed.owner_address_hash,
           )
 
+        let asset_name_is_pkh =
+          output_datum_typed.staking_mint_asset.asset_name == output_datum_typed.owner_address_hash
+
         let asset_is_valid =
-          output_datum_typed.staking_mint_asset.policy_id == policy_id && output_datum_typed.staking_mint_asset.asset_name == asset_name
+          output_datum_typed.staking_mint_asset.policy_id == policy_id
 
         let strike_asset_is_valid =
           output_datum_typed.strike_asset.policy_id == strike_policy_id && output_datum_typed.strike_asset.asset_name == strike_asset_name
@@ -162,9 +161,9 @@ validator staking(
         let last_rewarded_time_is_valid =
           get_lower_bound(transaction.validity_range) > output_datum_typed.last_rewarded_time
 
-        signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && strike_asset_is_valid && last_rewarded_time_is_valid
+        asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && strike_asset_is_valid && last_rewarded_time_is_valid
       }
-      Burn -> {
+      Burn(asset_name) -> {
         let expected_burnt = (policy_id, asset_name, -1)
 
         let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
