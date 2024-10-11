@@ -1,65 +1,14 @@
-# staking
+# Staking
 
-Write validators in the `validators` folder, and supporting functions in the `lib` folder using `.ak` as a file extension.
+## Features
 
-```aiken
-validator my_first_validator {
-  spend(_datum: Option<Data>, _redeemer: Data, _output_reference: Data, _context: Data) {
-    True
-  }
-}
-```
+- Daily staking rewards
+- Rewards are paid in ADA
+- Minimum staking period of 1 day to earn rewards
 
-## Building
+## How It Works
 
-```sh
-aiken build
-```
-
-## Configuring
-
-**aiken.toml**
-```toml
-[config.default]
-network_id = 41
-```
-
-Or, alternatively, write conditional environment modules under `env`.
-
-## Testing
-
-You can write tests in any module using the `test` keyword. For example:
-
-```aiken
-use config
-
-test foo() {
-  config.network_id + 1 == 42
-}
-```
-
-To run all tests, simply do:
-
-```sh
-aiken check
-```
-
-To run only tests matching the string `foo`, do:
-
-```sh
-aiken check -m foo
-```
-
-## Documentation
-
-If you're writing a library, you might want to generate an HTML documentation for it.
-
-Use:
-
-```sh
-aiken docs
-```
-
-## Resources
-
-Find more on the [Aiken's user manual](https://aiken-lang.org).
+1. Staking rewards are calculated and distributed once per day at a predetermined time.
+2. Users must have their STRIKE stake locked for at least 1 full day before they start earning rewards.
+3. All rewards are paid out in ADA.
+4. Users can unlock their rewards or withdraw their stake anytime
