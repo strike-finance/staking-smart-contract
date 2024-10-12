@@ -9,8 +9,8 @@ use cardano/transaction.{
 use constants.{min_lovelace_in_utxo}
 use staking_utils.{valid_distribute_rewards, validation_logic}
 use types.{
-  AddStakeOrConsumeStakingRewards, Burn, DistributeStakingRewards, Mint,
-  MintRedeemer, StakingDatum, StakingRedeemer, WithdrawStake,
+  AddStakeOrConsumeStakingRewards, AddressHash, Burn, DistributeStakingRewards,
+  Mint, MintRedeemer, StakingDatum, StakingRedeemer, WithdrawStake,
 }
 use utils.{
   get_address_outputs, get_lower_bound, get_script_hash, get_validators_inputs,
@@ -18,8 +18,9 @@ use utils.{
 }
 
 validator staking(
+  admin_pkh: AddressHash,
   strike_policy_id: PolicyId,
-  strike_asset_name: ByteArray,
+  staking_asset_name: ByteArray,
   strike_stake_credential: StakeCredential,
 ) {
   spend(
@@ -57,30 +58,30 @@ validator staking(
         expect output_datum_typed: StakingDatum = output_datum
 
         let datum_valid: Bool =
-          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.strike_asset == datum.strike_asset && output_datum_typed.last_rewarded_time == datum.last_rewarded_time
+          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.staking_asset == datum.staking_asset && output_datum_typed.last_rewarded_time == datum.last_rewarded_time
 
         let return_min_lovelace_valid =
           lovelace_of(output_to_validator.value) >= min_lovelace_in_utxo
 
-        let staking_mint_asset_returned =
+        let mint_asset_returned =
           quantity_of(
             output_to_validator.value,
-            datum.staking_mint_asset.policy_id,
-            datum.staking_mint_asset.asset_name,
+            datum.mint_asset.policy_id,
+            datum.mint_asset.asset_name,
           ) == 1
 
-        let strike_asset_returned =
+        let staking_asset_returned =
           quantity_of(
             output_to_validator.value,
-            datum.strike_asset.policy_id,
-            datum.strike_asset.asset_name,
+            datum.staking_asset.policy_id,
+            datum.staking_asset.asset_name,
           ) >= quantity_of(
             input_from_validator.output.value,
-            datum.strike_asset.policy_id,
-            datum.strike_asset.asset_name,
+            datum.staking_asset.policy_id,
+            datum.staking_asset.asset_name,
           )
 
-        strike_asset_returned && signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && staking_mint_asset_returned && strike_asset_returned
+        staking_asset_returned && signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && mint_asset_returned && staking_asset_returned
       }
       WithdrawStake -> {
         expect Some(datum) = datum
@@ -88,11 +89,7 @@ validator staking(
           list.has(transaction.extra_signatories, datum.owner_address_hash)
 
         let expected_burnt =
-          (
-            datum.staking_mint_asset.policy_id,
-            datum.staking_mint_asset.asset_name,
-            -1,
-          )
+          (datum.mint_asset.policy_id, datum.mint_asset.asset_name, -1)
 
         let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
 
@@ -117,12 +114,17 @@ validator staking(
   ) {
     expect Script(own_validator) = credential
 
-    valid_distribute_rewards(
-      validation_logic,
-      redeemer,
-      own_validator,
-      transaction,
-    )
+    let admin_signed = list.has(transaction.extra_signatories, admin_pkh)
+
+    let valid_distribute =
+      valid_distribute_rewards(
+        validation_logic,
+        redeemer,
+        own_validator,
+        transaction,
+      )
+
+    valid_distribute && admin_signed
   }
 
   mint(redeemer: MintRedeemer, policy_id: PolicyId, transaction: Transaction) {
@@ -139,7 +141,7 @@ validator staking(
         expect output_datum_typed: StakingDatum = output_datum
 
         let expected_minted =
-          (policy_id, output_datum_typed.staking_mint_asset.asset_name, 1)
+          (policy_id, output_datum_typed.mint_asset.asset_name, 1)
 
         let valid_mint = validate_token_mint(transaction.mint, expected_minted)
 
@@ -161,18 +163,25 @@ validator staking(
           )
 
         let asset_name_is_pkh =
-          output_datum_typed.staking_mint_asset.asset_name == output_datum_typed.owner_address_hash
+          output_datum_typed.mint_asset.asset_name == output_datum_typed.owner_address_hash
 
         let asset_is_valid =
-          output_datum_typed.staking_mint_asset.policy_id == policy_id
+          output_datum_typed.mint_asset.policy_id == policy_id
 
-        let strike_asset_is_valid =
-          output_datum_typed.strike_asset.policy_id == strike_policy_id && output_datum_typed.strike_asset.asset_name == strike_asset_name
+        let staking_asset_is_valid =
+          output_datum_typed.staking_asset.policy_id == strike_policy_id && output_datum_typed.staking_asset.asset_name == staking_asset_name
+
+        let at_least_one_staking_asset_is_sent =
+          quantity_of(
+            output_to_forward_contract.value,
+            strike_policy_id,
+            staking_asset_name,
+          ) > 0
 
         let last_rewarded_time_is_valid =
           get_lower_bound(transaction.validity_range) > output_datum_typed.last_rewarded_time
 
-        asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && strike_asset_is_valid && last_rewarded_time_is_valid
+        at_least_one_staking_asset_is_sent && asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && staking_asset_is_valid && last_rewarded_time_is_valid
       }
       Burn(asset_name) -> {
         let expected_burnt = (policy_id, asset_name, -1)
