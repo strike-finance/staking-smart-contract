@@ -16,7 +16,7 @@ pub type StakingDatum {
   owner_address_hash: AddressHash,
   staking_asset: AssetClass,
   mint_asset: AssetClass,
-  last_rewarded_time: POSIXTime,
+  staked_at: POSIXTime,
 }
 
 pub type StakingRedeemer {

@@ -4,15 +4,14 @@ use cardano/address.{Script}
 use cardano/assets.{lovelace_of, quantity_of}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction}
 use types.{StakingDatum}
-use utils.{get_lower_bound}
 
 pub fn valid_distribute_rewards(
-  validation_logic: fn(Output, Output, Int) -> Bool,
+  validation_logic: fn(Output, Output) -> Bool,
   redeemer: List<(Int, Int)>,
   own_validator: ScriptHash,
   transaction: Transaction,
 ) -> Bool {
-  let Transaction { inputs, outputs, validity_range, .. } = transaction
+  let Transaction { inputs, outputs, .. } = transaction
   let (script_inputs, script_input_count) =
     list.foldr(
       inputs,
@@ -32,8 +31,6 @@ pub fn valid_distribute_rewards(
       },
     )
 
-  let lower_bound: Int = get_lower_bound(validity_range)
-
   let indices: List<(Int, Int)> = redeemer
   let (_, _, input_index_count) =
     list.foldl(
@@ -45,7 +42,7 @@ pub fn valid_distribute_rewards(
         if in1 > in0 && out1 > out0 {
           expect Some(in_utxo) = script_inputs |> list.at(in1)
           expect Some(out_utxo) = outputs |> list.at(out1)
-          if validation_logic(in_utxo, out_utxo, lower_bound) {
+          if validation_logic(in_utxo, out_utxo) {
             (in1, out1, count + 1)
           } else {
             fail @"Validation failed"
@@ -58,7 +55,7 @@ pub fn valid_distribute_rewards(
   (script_input_count == input_index_count)?
 }
 
-pub fn validation_logic(input: Output, output: Output, lower_bound: Int) -> Bool {
+pub fn validation_logic(input: Output, output: Output) -> Bool {
   expect InlineDatum(input_datum) = input.datum
   expect input_datum_typed: StakingDatum = input_datum
 
@@ -96,7 +93,8 @@ pub fn validation_logic(input: Output, output: Output, lower_bound: Int) -> Bool
       input_datum_typed.staking_asset.asset_name,
     )
 
-  let updated_lower_bount = output_datum_typed.last_rewarded_time >= lower_bound
+  let staked_at_is_same =
+    output_datum_typed.staked_at == input_datum_typed.staked_at
 
-  staking_asset_returned && stake_credential_is_valid && datum_valid && lovelace_amount_increased && mint_asset_returned && updated_lower_bount
+  staking_asset_returned && stake_credential_is_valid && datum_valid && lovelace_amount_increased && mint_asset_returned && staked_at_is_same
 }

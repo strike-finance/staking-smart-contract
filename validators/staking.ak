@@ -58,7 +58,7 @@ validator staking(
         expect output_datum_typed: StakingDatum = output_datum
 
         let datum_valid: Bool =
-          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.staking_asset == datum.staking_asset && output_datum_typed.last_rewarded_time == datum.last_rewarded_time
+          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.staking_asset == datum.staking_asset && output_datum_typed.staked_at == datum.staked_at && output_datum_typed.mint_asset == datum.mint_asset
 
         let return_min_lovelace_valid =
           lovelace_of(output_to_validator.value) >= min_lovelace_in_utxo
@@ -81,7 +81,7 @@ validator staking(
             datum.staking_asset.asset_name,
           )
 
-        staking_asset_returned && signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && mint_asset_returned && staking_asset_returned
+        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && mint_asset_returned && staking_asset_returned
       }
       WithdrawStake -> {
         expect Some(datum) = datum
@@ -185,10 +185,13 @@ validator staking(
             output_datum_typed.mint_asset.asset_name,
           ) == 1
 
-        let last_rewarded_time_is_valid =
-          get_lower_bound(transaction.validity_range) > output_datum_typed.last_rewarded_time
+        let two_ada_in_output =
+          lovelace_of(output_to_forward_contract.value) == min_lovelace_in_utxo
 
-        mint_asset_is_sent && at_least_one_staking_asset_is_sent && asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && staking_asset_is_valid && last_rewarded_time_is_valid
+        let last_rewarded_time_is_valid =
+          get_lower_bound(transaction.validity_range) > output_datum_typed.staked_at
+
+        two_ada_in_output && mint_asset_is_sent && at_least_one_staking_asset_is_sent && asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && staking_asset_is_valid && last_rewarded_time_is_valid
       }
       Burn(asset_name) -> {
         let expected_burnt = (policy_id, asset_name, -1)
