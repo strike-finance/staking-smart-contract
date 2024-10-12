@@ -19,9 +19,9 @@ use utils.{
 
 validator staking(
   admin_pkh: AddressHash,
-  strike_policy_id: PolicyId,
+  staking_policy_id: PolicyId,
   staking_asset_name: ByteArray,
-  strike_stake_credential: StakeCredential,
+  stake_credential: StakeCredential,
 ) {
   spend(
     datum: Option<StakingDatum>,
@@ -51,7 +51,7 @@ validator staking(
           output_to_validator.address.stake_credential
 
         let stake_credential_is_valid =
-          output_stake_credential == strike_stake_credential
+          output_stake_credential == stake_credential
 
         expect InlineDatum(output_datum) = output_to_validator.datum
 
@@ -154,7 +154,7 @@ validator staking(
           output_to_forward_contract.address.stake_credential
 
         let stake_credential_is_valid =
-          output_to_collateral_stake_credential == strike_stake_credential
+          output_to_collateral_stake_credential == stake_credential
 
         let signed_by_owner =
           list.has(
@@ -169,19 +169,26 @@ validator staking(
           output_datum_typed.mint_asset.policy_id == policy_id
 
         let staking_asset_is_valid =
-          output_datum_typed.staking_asset.policy_id == strike_policy_id && output_datum_typed.staking_asset.asset_name == staking_asset_name
+          output_datum_typed.staking_asset.policy_id == staking_policy_id && output_datum_typed.staking_asset.asset_name == staking_asset_name
 
         let at_least_one_staking_asset_is_sent =
           quantity_of(
             output_to_forward_contract.value,
-            strike_policy_id,
+            staking_policy_id,
             staking_asset_name,
           ) > 0
+
+        let mint_asset_is_sent =
+          quantity_of(
+            output_to_forward_contract.value,
+            output_datum_typed.mint_asset.policy_id,
+            output_datum_typed.mint_asset.asset_name,
+          ) == 1
 
         let last_rewarded_time_is_valid =
           get_lower_bound(transaction.validity_range) > output_datum_typed.last_rewarded_time
 
-        at_least_one_staking_asset_is_sent && asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && staking_asset_is_valid && last_rewarded_time_is_valid
+        mint_asset_is_sent && at_least_one_staking_asset_is_sent && asset_name_is_pkh && signed_by_owner && valid_mint && output_is_to_forward_validator && stake_credential_is_valid && asset_is_valid && staking_asset_is_valid && last_rewarded_time_is_valid
       }
       Burn(asset_name) -> {
         let expected_burnt = (policy_id, asset_name, -1)

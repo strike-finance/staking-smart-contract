@@ -78,14 +78,25 @@ pub fn validation_logic(input: Output, output: Output, lower_bound: Int) -> Bool
   let lovelace_amount_increased =
     lovelace_of(output.value) >= lovelace_of(input.value)
 
-  let staking_mint_asset_returned =
+  let mint_asset_returned =
     quantity_of(
       output.value,
       input_datum_typed.mint_asset.policy_id,
       input_datum_typed.mint_asset.asset_name,
     ) == 1
 
+  let staking_asset_returned =
+    quantity_of(
+      output.value,
+      input_datum_typed.staking_asset.policy_id,
+      input_datum_typed.staking_asset.asset_name,
+    ) == quantity_of(
+      input.value,
+      input_datum_typed.staking_asset.policy_id,
+      input_datum_typed.staking_asset.asset_name,
+    )
+
   let updated_lower_bount = output_datum_typed.last_rewarded_time >= lower_bound
 
-  stake_credential_is_valid && datum_valid && lovelace_amount_increased && staking_mint_asset_returned && updated_lower_bount
+  staking_asset_returned && stake_credential_is_valid && datum_valid && lovelace_amount_increased && mint_asset_returned && updated_lower_bount
 }
