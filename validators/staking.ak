@@ -5,7 +5,7 @@ use aiken/interval.{Finite, Interval, IntervalBound}
 use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId, lovelace_of, quantity_of}
 use cardano/transaction.{
-  InlineDatum, Output, OutputReference, Transaction, find_input,
+  InlineDatum, Input, Output, OutputReference, Transaction, find_input,
   find_script_outputs,
 }
 use constants.{min_lovelace_in_utxo}
@@ -13,7 +13,7 @@ use staking_utils.{valid_distribute_rewards, validation_logic}
 use test_constants.{
   mint_asset, policy_id, stake_credential, staking_address,
   strike_collateral_asset, strike_collateral_asset_name,
-  strike_collateral_policy_id, trader_pkh,
+  strike_collateral_policy_id, trader_address, trader_pkh,
 }
 use types.{
   AddStakeOrConsumeStakingRewards, AssetClass, Burn, DistributeStakingRewards,
@@ -278,4 +278,266 @@ test mint() {
     }
   let redeemer = Mint
   staking.mint(params, redeemer, policy_id, tx)
+}
+
+test add_stake() {
+  let own_ref =
+    OutputReference {
+      transaction_id: #"b4971034feee28d07f157faf99b850f856d8da3494c70b19b521cfe690258e26",
+      output_index: 0,
+    }
+
+  let stake_datum =
+    StakingDatum {
+      owner_address_hash: trader_pkh,
+      mint_asset,
+      staking_asset: strike_collateral_asset,
+      staked_at: 1727453227631,
+    }
+
+  let mint = assets.from_asset(policy_id, trader_pkh, 1)
+
+  let staking_sent =
+    assets.from_asset(
+      strike_collateral_asset.policy_id,
+      strike_collateral_asset.asset_name,
+      1,
+    )
+
+  let input =
+    Input {
+      output_reference: own_ref,
+      output: Output {
+        address: staking_address,
+        value: mint
+          |> assets.merge(staking_sent)
+          |> assets.merge(assets.from_lovelace(2_000_000)),
+        datum: InlineDatum(stake_datum),
+        reference_script: None,
+      },
+    }
+
+  let output =
+    Output {
+      address: staking_address,
+      value: mint
+        |> assets.merge(staking_sent)
+        |> assets.merge(assets.from_lovelace(2_000_000)),
+      datum: InlineDatum(stake_datum),
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      inputs: [input],
+      reference_inputs: [],
+      outputs: [output],
+      fee: 0,
+      mint,
+      certificates: [],
+      withdrawals: [],
+      validity_range: Interval {
+        lower_bound: IntervalBound {
+          bound_type: Finite(1727453227635),
+          is_inclusive: False,
+        },
+        upper_bound: IntervalBound {
+          bound_type: Finite(1727456400000),
+          is_inclusive: False,
+        },
+      },
+      extra_signatories: [trader_pkh],
+      redeemers: [],
+      datums: dict.empty,
+      id: #"0000000000000000000000000000000000000000000000000000000000000000",
+      votes: [],
+      proposal_procedures: [],
+      current_treasury_amount: None,
+      treasury_donation: None,
+    }
+
+  let params =
+    StakingParams {
+      admin_pkh: trader_pkh,
+      staking_policy_id: strike_collateral_policy_id,
+      staking_asset_name: strike_collateral_asset_name,
+      stake_credential,
+    }
+  let redeemer = AddStakeOrConsumeStakingRewards
+  staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
+}
+
+test consume_rewards() {
+  let own_ref =
+    OutputReference {
+      transaction_id: #"b4971034feee28d07f157faf99b850f856d8da3494c70b19b521cfe690258e26",
+      output_index: 0,
+    }
+
+  let stake_datum =
+    StakingDatum {
+      owner_address_hash: trader_pkh,
+      mint_asset,
+      staking_asset: strike_collateral_asset,
+      staked_at: 1727453227631,
+    }
+
+  let mint = assets.from_asset(policy_id, trader_pkh, 1)
+
+  let staking_sent =
+    assets.from_asset(
+      strike_collateral_asset.policy_id,
+      strike_collateral_asset.asset_name,
+      10,
+    )
+
+  let input =
+    Input {
+      output_reference: own_ref,
+      output: Output {
+        address: staking_address,
+        value: mint
+          |> assets.merge(staking_sent)
+          |> assets.merge(assets.from_lovelace(6_000_000)),
+        datum: InlineDatum(stake_datum),
+        reference_script: None,
+      },
+    }
+
+  let output =
+    Output {
+      address: staking_address,
+      value: mint
+        |> assets.merge(staking_sent)
+        |> assets.merge(assets.from_lovelace(2_000_000)),
+      datum: InlineDatum(stake_datum),
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      inputs: [input],
+      reference_inputs: [],
+      outputs: [output],
+      fee: 0,
+      mint: assets.zero,
+      certificates: [],
+      withdrawals: [],
+      validity_range: Interval {
+        lower_bound: IntervalBound {
+          bound_type: Finite(1727453227635),
+          is_inclusive: False,
+        },
+        upper_bound: IntervalBound {
+          bound_type: Finite(1727456400000),
+          is_inclusive: False,
+        },
+      },
+      extra_signatories: [trader_pkh],
+      redeemers: [],
+      datums: dict.empty,
+      id: #"0000000000000000000000000000000000000000000000000000000000000000",
+      votes: [],
+      proposal_procedures: [],
+      current_treasury_amount: None,
+      treasury_donation: None,
+    }
+
+  let params =
+    StakingParams {
+      admin_pkh: trader_pkh,
+      staking_policy_id: strike_collateral_policy_id,
+      staking_asset_name: strike_collateral_asset_name,
+      stake_credential,
+    }
+  let redeemer = AddStakeOrConsumeStakingRewards
+  staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
+}
+
+test withdraw_stake() {
+  let own_ref =
+    OutputReference {
+      transaction_id: #"b4971034feee28d07f157faf99b850f856d8da3494c70b19b521cfe690258e26",
+      output_index: 0,
+    }
+
+  let stake_datum =
+    StakingDatum {
+      owner_address_hash: trader_pkh,
+      mint_asset,
+      staking_asset: strike_collateral_asset,
+      staked_at: 1727453227631,
+    }
+
+  let previous_mint = assets.from_asset(policy_id, trader_pkh, 1)
+
+  let mint = assets.from_asset(policy_id, trader_pkh, -1)
+
+  let staking_sent =
+    assets.from_asset(
+      strike_collateral_asset.policy_id,
+      strike_collateral_asset.asset_name,
+      10,
+    )
+
+  let input =
+    Input {
+      output_reference: own_ref,
+      output: Output {
+        address: staking_address,
+        value: previous_mint
+          |> assets.merge(staking_sent)
+          |> assets.merge(assets.from_lovelace(6_000_000)),
+        datum: InlineDatum(stake_datum),
+        reference_script: None,
+      },
+    }
+
+  let output =
+    Output {
+      address: trader_address,
+      value: staking_sent
+        |> assets.merge(assets.from_lovelace(6_000_000)),
+      datum: InlineDatum(stake_datum),
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      inputs: [input],
+      reference_inputs: [],
+      outputs: [output],
+      fee: 0,
+      mint,
+      certificates: [],
+      withdrawals: [],
+      validity_range: Interval {
+        lower_bound: IntervalBound {
+          bound_type: Finite(1727453227635),
+          is_inclusive: False,
+        },
+        upper_bound: IntervalBound {
+          bound_type: Finite(1727456400000),
+          is_inclusive: False,
+        },
+      },
+      extra_signatories: [trader_pkh],
+      redeemers: [],
+      datums: dict.empty,
+      id: #"0000000000000000000000000000000000000000000000000000000000000000",
+      votes: [],
+      proposal_procedures: [],
+      current_treasury_amount: None,
+      treasury_donation: None,
+    }
+
+  let params =
+    StakingParams {
+      admin_pkh: trader_pkh,
+      staking_policy_id: strike_collateral_policy_id,
+      staking_asset_name: strike_collateral_asset_name,
+      stake_credential,
+    }
+  let redeemer = WithdrawStake
+  staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
 }

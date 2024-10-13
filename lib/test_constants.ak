@@ -34,3 +34,9 @@ pub const staking_address =
     payment_credential: Script(staking_script_hash),
     stake_credential: Some(stake_credential),
   }
+
+pub const trader_address =
+  Address {
+    payment_credential: VerificationKey(trader_pkh),
+    stake_credential: Some(stake_credential),
+  }
