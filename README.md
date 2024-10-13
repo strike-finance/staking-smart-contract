@@ -3,9 +3,9 @@
 ## How It Works
 
 1. Staking rewards are calculated and distributed to all stakers once per day at a predetermined time.
-2. Stakers must have their STRIKE stake locked for at least one full day before they start earning rewards.
+2. Stakers must have their stake assets locked for at least one full day before they start earning rewards.
 3. All rewards are paid out in ADA.
-4. Stakers can add or remove part of their staked STRIKE.
+4. Stakers can add or remove part of their staked asset.
 5. Stakers can unlock their rewards or withdraw all of their stake at any time.
 
 ## High-Level Overview
@@ -28,8 +28,6 @@ There are five actions that can occur. Stakers will have a UTxO at the multi-val
 3. Withdraw Rewards
 4. Withdraw Stakes and Rewards
 5. Distribute Stake
-
-Distributing stake will require the admin to create an off-chain script that distributes it fairly.
 
 ## Stake
 
