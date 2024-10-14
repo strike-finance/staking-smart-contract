@@ -93,8 +93,15 @@ pub fn validation_logic(input: Output, output: Output) -> Bool {
       input_datum_typed.staking_asset.asset_name,
     )
 
+  let staker_identifier_mint_returned =
+    quantity_of(
+      output.value,
+      input_datum_typed.mint_asset.policy_id,
+      input_datum_typed.owner_address_hash,
+    ) == 1
+
   let staked_at_is_same =
     output_datum_typed.staked_at == input_datum_typed.staked_at
 
-  staking_asset_returned && stake_credential_is_valid && datum_valid && lovelace_amount_increased && mint_asset_returned && staked_at_is_same
+  staking_asset_returned && stake_credential_is_valid && datum_valid && lovelace_amount_increased && mint_asset_returned && staked_at_is_same && staker_identifier_mint_returned
 }

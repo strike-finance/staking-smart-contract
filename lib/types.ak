@@ -33,6 +33,7 @@ pub type MintRedeemer {
 
 pub type StakingParams {
   admin_pkh: AddressHash,
+  asset_name: AssetName,
   staking_policy_id: PolicyId,
   staking_asset_name: ByteArray,
   stake_credential: StakeCredential,
