@@ -28,7 +28,7 @@ pub type StakingRedeemer {
 
 pub type MintRedeemer {
   Mint
-  Burn(AssetName)
+  Burn(AssetName, AddressHash)
 }
 
 pub type StakingParams {

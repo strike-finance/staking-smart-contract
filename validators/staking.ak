@@ -226,12 +226,21 @@ validator staking(params: StakingParams) {
         valid_staker_identifier_mint && staker_identifier_mint_is_sent && mint_asset_is_sent && valid_mint && two_ada_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && at_least_one_staking_asset_is_sent && signed_by_owner && output_is_to_forward_validator && stake_credential_is_valid
       }
 
-      Burn(asset_name) -> {
+      Burn(asset_name, owner_address_hash) -> {
         let expected_burnt = (policy_id, asset_name, -1)
+
+        let expected_staker_identifier_burnt =
+          (policy_id, owner_address_hash, -1)
 
         let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
 
-        valid_mint
+        let valid_staker_identifier_mint =
+          validate_token_mint(
+            transaction.mint,
+            expected_staker_identifier_burnt,
+          )
+
+        valid_mint && valid_staker_identifier_mint
       }
     }
   }
