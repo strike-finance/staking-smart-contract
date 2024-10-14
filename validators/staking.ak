@@ -102,9 +102,18 @@ validator staking(params: StakingParams) {
         let expected_burnt =
           (datum.mint_asset.policy_id, datum.mint_asset.asset_name, -1)
 
+        let expected_staker_identifier_burnt =
+          (datum.mint_asset.policy_id, datum.owner_address_hash, -1)
+
         let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
 
-        signed_by_owner && valid_mint
+        let valid_staker_identifier_mint =
+          validate_token_mint(
+            transaction.mint,
+            expected_staker_identifier_burnt,
+          )
+
+        signed_by_owner && valid_mint && valid_staker_identifier_mint
       }
       DistributeStakingRewards -> {
         expect Some(input) = find_input(transaction.inputs, my_output_reference)
