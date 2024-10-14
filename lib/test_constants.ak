@@ -23,7 +23,7 @@ pub const strike_collateral_asset_name = #"535452494b45"
 
 pub const asset_name = #"53545241"
 
-pub const mint_asset = AssetClass { policy_id, asset_name: trader_pkh }
+pub const mint_asset = AssetClass { policy_id, asset_name }
 
 pub const stake_credential: StakeCredential =
   Inline(VerificationKey(stake_credential_pkh))
