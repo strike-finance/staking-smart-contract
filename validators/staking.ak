@@ -22,8 +22,8 @@ use types.{
   WithdrawStake,
 }
 use utils.{
-  get_address_outputs, get_lower_bound, get_script_hash, get_validators_inputs,
-  validate_token_mint,
+  compare_stake, get_address_outputs, get_lower_bound, get_script_hash,
+  get_validators_inputs, validate_token_mint,
 }
 
 validator staking(params: StakingParams) {
@@ -178,11 +178,14 @@ validator staking(params: StakingParams) {
 
         let output_is_to_forward_validator = output_script_hash == policy_id
 
-        expect Some(output_to_collateral_stake_credential) =
+        expect Some(output_to_forward_stake_credential) =
           output_to_forward_contract.address.stake_credential
 
         let stake_credential_is_valid =
-          output_to_collateral_stake_credential == params.stake_credential
+          compare_stake(
+            output_to_forward_stake_credential,
+            params.stake_credential,
+          )
 
         let signed_by_owner =
           list.has(
@@ -217,13 +220,13 @@ validator staking(params: StakingParams) {
             output_datum_typed.owner_address_hash,
           ) == 1
 
-        let two_ada_in_output =
+        let min_lovelace_in_output =
           lovelace_of(output_to_forward_contract.value) == min_lovelace_in_utxo
 
         let last_rewarded_time_is_valid =
-          get_lower_bound(transaction.validity_range) > output_datum_typed.staked_at
+          get_lower_bound(transaction.validity_range) >= output_datum_typed.staked_at
 
-        valid_staker_identifier_mint && staker_identifier_mint_is_sent && mint_asset_is_sent && valid_mint && two_ada_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && at_least_one_staking_asset_is_sent && signed_by_owner && output_is_to_forward_validator && stake_credential_is_valid
+        valid_staker_identifier_mint && staker_identifier_mint_is_sent && mint_asset_is_sent && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && at_least_one_staking_asset_is_sent && signed_by_owner && output_is_to_forward_validator && stake_credential_is_valid
       }
 
       Burn(asset_name, owner_address_hash) -> {

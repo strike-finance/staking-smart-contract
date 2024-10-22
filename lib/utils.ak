@@ -2,7 +2,10 @@ use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite}
-use cardano/address.{Address, Credential, Script}
+use aiken/primitive/bytearray
+use cardano/address.{
+  Address, Credential, Inline, Script, StakeCredential, VerificationKey,
+}
 use cardano/assets.{PolicyId, Value, flatten, tokens}
 use cardano/transaction.{Input, Output, Transaction, ValidityRange}
 
@@ -56,4 +59,27 @@ pub fn get_script_hash(address: Address) -> ScriptHash {
 pub fn get_lower_bound(range: ValidityRange) -> Int {
   expect Finite(lower_bound) = range.lower_bound.bound_type
   lower_bound
+}
+
+pub fn compare_stake(left: StakeCredential, right: StakeCredential) -> Bool {
+  let left =
+    when left is {
+      Inline(Script(x)) -> x
+      Inline(VerificationKey(x)) -> x
+      _ -> fail
+    }
+  let right =
+    when right is {
+      Inline(Script(x)) -> x
+      Inline(VerificationKey(x)) -> x
+      _ -> fail
+    }
+
+  let result = bytearray.compare(left, right)
+
+  when result is {
+    Less -> False
+    Equal -> True
+    Greater -> False
+  }
 }
