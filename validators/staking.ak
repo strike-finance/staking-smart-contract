@@ -3,7 +3,7 @@ use aiken/collection/list
 use aiken/collection/pairs
 use aiken/interval.{Finite, Interval, IntervalBound}
 use cardano/address.{Address, Credential, Script}
-use cardano/assets.{PolicyId, lovelace_of, quantity_of}
+use cardano/assets.{PolicyId, lovelace_of, match, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, find_input,
   find_script_outputs,
@@ -67,32 +67,27 @@ validator staking(params: StakingParams) {
         let return_min_lovelace_valid =
           lovelace_of(output_to_validator.value) >= min_lovelace_in_utxo
 
-        let mint_asset_returned =
+        let quantity_of_staking_asset_in_input =
           quantity_of(
-            output_to_validator.value,
-            datum.mint_asset.policy_id,
-            datum.mint_asset.asset_name,
-          ) == 1
-
-        let staker_identifier_mint_returned =
-          quantity_of(
-            output_to_validator.value,
-            datum.mint_asset.policy_id,
-            datum.owner_address_hash,
-          ) == 1
-
-        let staking_asset_returned =
-          quantity_of(
-            output_to_validator.value,
-            datum.staking_asset.policy_id,
-            datum.staking_asset.asset_name,
-          ) >= quantity_of(
             input_from_validator.output.value,
-            datum.staking_asset.policy_id,
-            datum.staking_asset.asset_name,
+            params.staking_policy_id,
+            params.staking_asset_name,
           )
 
-        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && mint_asset_returned && staking_asset_returned && staker_identifier_mint_returned
+        let expected_assets_locked =
+          assets.from_lovelace(min_lovelace_in_utxo)
+            |> assets.add(
+                params.staking_policy_id,
+                params.staking_asset_name,
+                quantity_of_staking_asset_in_input,
+              )
+            |> assets.add(policy_id, params.asset_name, 1)
+            |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
+
+        let assets_match =
+          match(output_to_validator.value, expected_assets_locked, >=)
+
+        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && assets_match
       }
       WithdrawStake -> {
         expect Some(datum) = datum
@@ -198,27 +193,17 @@ validator staking(params: StakingParams) {
 
         let staking_asset_is_valid =
           output_datum_typed.staking_asset.policy_id == params.staking_policy_id && output_datum_typed.staking_asset.asset_name == params.staking_asset_name
+        // the asset required for staking
+        // minted assets to validate the stake is valid
+        // minted asset with owner pubkeyhash for better offchain indexing
+        let expected_assets_locked =
+          assets.from_lovelace(min_lovelace_in_utxo)
+            |> assets.add(params.staking_policy_id, params.staking_asset_name, 1)
+            |> assets.add(policy_id, params.asset_name, 1)
+            |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
 
-        let at_least_one_staking_asset_is_sent =
-          quantity_of(
-            output_to_forward_contract.value,
-            params.staking_policy_id,
-            params.staking_asset_name,
-          ) > 0
-
-        let mint_asset_is_sent =
-          quantity_of(
-            output_to_forward_contract.value,
-            policy_id,
-            params.asset_name,
-          ) == 1
-
-        let staker_identifier_mint_is_sent =
-          quantity_of(
-            output_to_forward_contract.value,
-            policy_id,
-            output_datum_typed.owner_address_hash,
-          ) == 1
+        let assets_match =
+          match(output_to_forward_contract.value, expected_assets_locked, >=)
 
         let min_lovelace_in_output =
           lovelace_of(output_to_forward_contract.value) == min_lovelace_in_utxo
@@ -226,7 +211,7 @@ validator staking(params: StakingParams) {
         let last_rewarded_time_is_valid =
           get_lower_bound(transaction.validity_range) >= output_datum_typed.staked_at
 
-        stake_credential_is_valid && valid_staker_identifier_mint && staker_identifier_mint_is_sent && mint_asset_is_sent && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && at_least_one_staking_asset_is_sent && signed_by_owner && output_is_to_forward_validator
+        output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_staker_identifier_mint && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && assets_match
       }
 
       Burn(asset_name, owner_address_hash) -> {
@@ -279,7 +264,7 @@ test mint() {
       value: mint
         |> assets.merge(staking_sent)
         |> assets.merge(staker_identifier_mint)
-        |> assets.merge(assets.from_lovelace(2_000_000)),
+        |> assets.merge(assets.from_lovelace(min_lovelace_in_utxo)),
       datum: InlineDatum(stake_datum),
       reference_script: None,
     }
@@ -360,7 +345,7 @@ test add_stake() {
         value: mint
           |> assets.merge(staking_sent)
           |> assets.merge(staker_identifier_mint_sent)
-          |> assets.merge(assets.from_lovelace(2_000_000)),
+          |> assets.merge(assets.from_lovelace(min_lovelace_in_utxo)),
         datum: InlineDatum(stake_datum),
         reference_script: None,
       },
@@ -372,7 +357,7 @@ test add_stake() {
       value: mint
         |> assets.merge(staking_sent)
         |> assets.merge(staker_identifier_mint_sent)
-        |> assets.merge(assets.from_lovelace(2_000_000)),
+        |> assets.merge(assets.from_lovelace(min_lovelace_in_utxo)),
       datum: InlineDatum(stake_datum),
       reference_script: None,
     }
@@ -462,7 +447,7 @@ test consume_rewards() {
       value: mint
         |> assets.merge(staking_sent)
         |> assets.merge(staker_identifier_mint_sent)
-        |> assets.merge(assets.from_lovelace(2_000_000)),
+        |> assets.merge(assets.from_lovelace(min_lovelace_in_utxo)),
       datum: InlineDatum(stake_datum),
       reference_script: None,
     }

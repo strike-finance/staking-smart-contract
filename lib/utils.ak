@@ -62,8 +62,6 @@ pub fn get_lower_bound(range: ValidityRange) -> Int {
 }
 
 pub fn compare_stake(left: StakeCredential, right: StakeCredential) -> Bool {
-  trace @"left": left
-  trace @"right": right
   let left =
     when left is {
       Inline(Script(x)) -> x
