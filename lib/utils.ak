@@ -35,9 +35,9 @@ pub fn get_script_hash(address: Address) -> ScriptHash {
   }
 }
 
-pub fn get_lower_bound(range: ValidityRange) -> Int {
-  expect Finite(lower_bound) = range.lower_bound.bound_type
-  lower_bound
+pub fn get_upper_bound(range: ValidityRange) -> Int {
+  expect Finite(upper_bound) = range.upper_bound.bound_type
+  upper_bound
 }
 
 pub fn compare_stake(left: StakeCredential, right: StakeCredential) -> Bool {

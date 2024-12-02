@@ -22,7 +22,7 @@ use types.{
   WithdrawStake,
 }
 use utils.{
-  compare_stake, get_address_outputs, get_lower_bound, get_script_hash,
+  compare_stake, get_address_outputs, get_script_hash, get_upper_bound,
   get_validators_inputs,
 }
 
@@ -198,7 +198,7 @@ validator staking(params: StakingParams) {
           lovelace_of(output_to_forward_contract.value) == min_lovelace_in_utxo
 
         let last_rewarded_time_is_valid =
-          get_lower_bound(transaction.validity_range) >= output_datum_typed.staked_at
+          get_upper_bound(transaction.validity_range) >= output_datum_typed.staked_at
 
         output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && assets_match
       }
