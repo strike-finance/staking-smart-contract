@@ -1,4 +1,3 @@
-use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use aiken/interval.{Finite}
@@ -6,7 +5,6 @@ use aiken/primitive/bytearray
 use cardano/address.{
   Address, Credential, Inline, Script, StakeCredential, VerificationKey,
 }
-use cardano/assets.{PolicyId, Value, flatten, tokens}
 use cardano/transaction.{Input, Output, Transaction, ValidityRange}
 
 pub fn get_address_outputs(
@@ -30,25 +28,6 @@ pub fn is_script_credential(credential: Credential) -> Bool {
   }
 }
 
-pub fn validate_token_mint(
-  mints: Value,
-  expected_minting: (ByteArray, ByteArray, Int),
-) -> Bool {
-  when list.find(flatten(mints), fn(mint) { mint == expected_minting }) is {
-    Some(_) -> only_one_token_in_policy_minted(mints, expected_minting)
-    None -> False
-  }
-}
-
-// Make sure only two token is minted from the asset tuple
-fn only_one_token_in_policy_minted(mints, expected_minting) {
-  let (policy_id, _, _) = expected_minting
-  let policy_id: PolicyId = policy_id
-  // Check for the policy mints
-  list.length(dict.keys(tokens(mints, policy_id))) == 2
-  // Total count of minted unique tokens with policy is two
-}
-
 pub fn get_script_hash(address: Address) -> ScriptHash {
   when address.payment_credential is {
     Script(validator_hash) -> validator_hash
@@ -68,12 +47,17 @@ pub fn compare_stake(left: StakeCredential, right: StakeCredential) -> Bool {
       Inline(VerificationKey(x)) -> x
       _ -> fail
     }
+
+  trace @"Left:": left
+
   let right =
     when right is {
       Inline(Script(x)) -> x
       Inline(VerificationKey(x)) -> x
       _ -> fail
     }
+
+  trace @"Right: ": right
 
   let result = bytearray.compare(left, right)
 

@@ -23,7 +23,7 @@ use types.{
 }
 use utils.{
   compare_stake, get_address_outputs, get_lower_bound, get_script_hash,
-  get_validators_inputs, validate_token_mint,
+  get_validators_inputs,
 }
 
 validator staking(params: StakingParams) {
@@ -94,21 +94,17 @@ validator staking(params: StakingParams) {
         let signed_by_owner =
           list.has(transaction.extra_signatories, datum.owner_address_hash)
 
-        let expected_burnt =
-          (datum.mint_asset.policy_id, datum.mint_asset.asset_name, -1)
-
-        let expected_staker_identifier_burnt =
-          (datum.mint_asset.policy_id, datum.owner_address_hash, -1)
-
-        let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
-
-        let valid_staker_identifier_mint =
-          validate_token_mint(
-            transaction.mint,
-            expected_staker_identifier_burnt,
+        let expected_assets_burnt =
+          assets.from_asset(
+            datum.mint_asset.policy_id,
+            datum.mint_asset.asset_name,
+            -1,
           )
+            |> assets.add(datum.mint_asset.policy_id, datum.owner_address_hash, -1)
 
-        signed_by_owner && valid_mint && valid_staker_identifier_mint
+        let valid_mint = expected_assets_burnt == transaction.mint
+
+        signed_by_owner && valid_mint
       }
       DistributeStakingRewards -> {
         expect Some(input) = find_input(transaction.inputs, my_output_reference)
@@ -155,18 +151,11 @@ validator staking(params: StakingParams) {
 
         expect output_datum_typed: StakingDatum = output_datum
 
-        let expected_minted = (policy_id, params.asset_name, 1)
+        let expected_assets_minted =
+          assets.from_asset(policy_id, params.asset_name, 1)
+            |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
 
-        let expected_staker_identifier_minted =
-          (policy_id, output_datum_typed.owner_address_hash, 1)
-
-        let valid_mint = validate_token_mint(transaction.mint, expected_minted)
-
-        let valid_staker_identifier_mint =
-          validate_token_mint(
-            transaction.mint,
-            expected_staker_identifier_minted,
-          )
+        let valid_mint = expected_assets_minted == transaction.mint
 
         let output_script_hash =
           get_script_hash(output_to_forward_contract.address)
@@ -211,24 +200,17 @@ validator staking(params: StakingParams) {
         let last_rewarded_time_is_valid =
           get_lower_bound(transaction.validity_range) >= output_datum_typed.staked_at
 
-        output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_staker_identifier_mint && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && assets_match
+        output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && assets_match
       }
 
       Burn(asset_name, owner_address_hash) -> {
-        let expected_burnt = (policy_id, asset_name, -1)
+        let expected_burnt =
+          assets.from_asset(policy_id, asset_name, -1)
+            |> assets.add(policy_id, owner_address_hash, -1)
 
-        let expected_staker_identifier_burnt =
-          (policy_id, owner_address_hash, -1)
+        let valid_mint = expected_burnt == transaction.mint
 
-        let valid_mint = validate_token_mint(transaction.mint, expected_burnt)
-
-        let valid_staker_identifier_mint =
-          validate_token_mint(
-            transaction.mint,
-            expected_staker_identifier_burnt,
-          )
-
-        valid_mint && valid_staker_identifier_mint
+        valid_mint
       }
     }
   }
