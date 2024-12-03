@@ -1,5 +1,4 @@
 use aiken/crypto.{Blake2b_224, Hash, VerificationKey}
-use cardano/address.{StakeCredential}
 use cardano/assets.{AssetName, PolicyId}
 
 pub type AddressHash =
@@ -15,9 +14,8 @@ pub type AssetClass {
 
 pub type StakingDatum {
   owner_address_hash: AddressHash,
-  staking_asset: AssetClass,
-  mint_asset: AssetClass,
   staked_at: POSIXTime,
+  mint_policy_id: PolicyId,
 }
 
 pub type StakingRedeemer {
@@ -27,7 +25,7 @@ pub type StakingRedeemer {
 }
 
 pub type MintRedeemer {
-  Mint
+  Mint(Int)
   Burn(AssetName, AddressHash)
 }
 
@@ -36,5 +34,5 @@ pub type StakingParams {
   asset_name: AssetName,
   staking_policy_id: PolicyId,
   staking_asset_name: ByteArray,
-  stake_credential: StakeCredential,
+  stake_credential: ByteArray,
 }

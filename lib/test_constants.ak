@@ -1,7 +1,7 @@
 use cardano/address.{Address, Inline, Script, StakeCredential, VerificationKey}
 use types.{AssetClass}
 
-pub const policy_id =
+pub const mint_policy_id =
   #"00a0b79a29bb50da169ef9ee302aa8acca1dd62ba2d7fa57331847f0"
 
 pub const staking_script_hash =
@@ -23,7 +23,7 @@ pub const strike_collateral_asset_name = #"535452494b45"
 
 pub const asset_name = #"53545241"
 
-pub const mint_asset = AssetClass { policy_id, asset_name }
+pub const mint_asset = AssetClass { policy_id: mint_policy_id, asset_name }
 
 pub const stake_credential: StakeCredential =
   Inline(VerificationKey(stake_credential_pkh))

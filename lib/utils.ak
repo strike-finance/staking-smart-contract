@@ -40,24 +40,13 @@ pub fn get_upper_bound(range: ValidityRange) -> Int {
   upper_bound
 }
 
-pub fn compare_stake(left: StakeCredential, right: StakeCredential) -> Bool {
+pub fn compare_stake(left: StakeCredential, right: ByteArray) -> Bool {
   let left =
     when left is {
       Inline(Script(x)) -> x
       Inline(VerificationKey(x)) -> x
       _ -> fail
     }
-
-  trace @"Left:": left
-
-  let right =
-    when right is {
-      Inline(Script(x)) -> x
-      Inline(VerificationKey(x)) -> x
-      _ -> fail
-    }
-
-  trace @"Right: ": right
 
   let result = bytearray.compare(left, right)
 

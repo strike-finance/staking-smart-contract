@@ -11,7 +11,7 @@ use cardano/transaction.{
 use constants.{min_lovelace_in_utxo}
 use staking_utils.{valid_distribute_rewards, validation_logic}
 use test_constants.{
-  admin_pkh, asset_name, mint_asset, policy_id, stake_credential,
+  admin_pkh, asset_name, mint_policy_id, stake_credential_pkh,
   stake_script_credential, staking_address, strike_collateral_asset,
   strike_collateral_asset_name, strike_collateral_policy_id, trader_address,
   trader_pkh,
@@ -55,14 +55,14 @@ validator staking(params: StakingParams) {
           output_to_validator.address.stake_credential
 
         let stake_credential_is_valid =
-          output_stake_credential == params.stake_credential
+          compare_stake(output_stake_credential, params.stake_credential)
 
         expect InlineDatum(output_datum) = output_to_validator.datum
 
         expect output_datum_typed: StakingDatum = output_datum
 
         let datum_valid: Bool =
-          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.staking_asset == datum.staking_asset && output_datum_typed.staked_at == datum.staked_at && output_datum_typed.mint_asset == datum.mint_asset
+          output_datum_typed.owner_address_hash == datum.owner_address_hash && output_datum_typed.staked_at == datum.staked_at && datum.mint_policy_id == datum.mint_policy_id
 
         let return_min_lovelace_valid =
           lovelace_of(output_to_validator.value) >= min_lovelace_in_utxo
@@ -81,8 +81,8 @@ validator staking(params: StakingParams) {
                 params.staking_asset_name,
                 quantity_of_staking_asset_in_input,
               )
-            |> assets.add(policy_id, params.asset_name, 1)
-            |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
+            |> assets.add(datum.mint_policy_id, params.asset_name, 1)
+            |> assets.add(datum.mint_policy_id, datum.owner_address_hash, 1)
 
         let assets_match =
           match(output_to_validator.value, expected_assets_locked, >=)
@@ -95,12 +95,8 @@ validator staking(params: StakingParams) {
           list.has(transaction.extra_signatories, datum.owner_address_hash)
 
         let expected_assets_burnt =
-          assets.from_asset(
-            datum.mint_asset.policy_id,
-            datum.mint_asset.asset_name,
-            -1,
-          )
-            |> assets.add(datum.mint_asset.policy_id, datum.owner_address_hash, -1)
+          assets.from_asset(datum.mint_policy_id, params.asset_name, -1)
+            |> assets.add(datum.mint_policy_id, datum.owner_address_hash, -1)
 
         let valid_mint = expected_assets_burnt == transaction.mint
 
@@ -133,6 +129,9 @@ validator staking(params: StakingParams) {
         redeemer,
         own_validator,
         transaction,
+        params.asset_name,
+        params.staking_policy_id,
+        params.staking_asset_name,
       )
 
     valid_distribute && admin_signed
@@ -140,7 +139,7 @@ validator staking(params: StakingParams) {
 
   mint(redeemer: MintRedeemer, policy_id: PolicyId, transaction: Transaction) {
     when redeemer is {
-      Mint -> {
+      Mint(staking_amount) -> {
         let outputs_to_forward_contract: List<Output> =
           find_script_outputs(transaction.outputs, policy_id)
 
@@ -176,21 +175,20 @@ validator staking(params: StakingParams) {
             transaction.extra_signatories,
             output_datum_typed.owner_address_hash,
           )
+        let asset_is_valid = output_datum_typed.mint_policy_id == policy_id
 
-        let asset_is_valid =
-          output_datum_typed.mint_asset.policy_id == policy_id && output_datum_typed.mint_asset.asset_name == params.asset_name
-
-        let staking_asset_is_valid =
-          output_datum_typed.staking_asset.policy_id == params.staking_policy_id && output_datum_typed.staking_asset.asset_name == params.staking_asset_name
         // the asset required for staking
         // minted assets to validate the stake is valid
         // minted asset with owner pubkeyhash for better offchain indexing
         let expected_assets_locked =
           assets.from_lovelace(min_lovelace_in_utxo)
-            |> assets.add(params.staking_policy_id, params.staking_asset_name, 1)
+            |> assets.add(
+                params.staking_policy_id,
+                params.staking_asset_name,
+                staking_amount,
+              )
             |> assets.add(policy_id, params.asset_name, 1)
             |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
-
         let assets_match =
           match(output_to_forward_contract.value, expected_assets_locked, >=)
 
@@ -200,7 +198,7 @@ validator staking(params: StakingParams) {
         let last_rewarded_time_is_valid =
           get_upper_bound(transaction.validity_range) >= output_datum_typed.staked_at
 
-        output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && staking_asset_is_valid && asset_is_valid && assets_match
+        output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && asset_is_valid && assets_match
       }
 
       Burn(asset_name, owner_address_hash) -> {
@@ -224,9 +222,8 @@ test mint() {
   let stake_datum =
     StakingDatum {
       owner_address_hash: trader_pkh,
-      mint_asset,
-      staking_asset: strike_collateral_asset,
       staked_at: 1727453227631,
+      mint_policy_id,
     }
 
   let staking_sent =
@@ -236,9 +233,9 @@ test mint() {
       1,
     )
 
-  let mint = assets.from_asset(policy_id, asset_name, 1)
+  let mint = assets.from_asset(mint_policy_id, asset_name, 1)
 
-  let staker_identifier_mint = assets.from_asset(policy_id, trader_pkh, 1)
+  let staker_identifier_mint = assets.from_asset(mint_policy_id, trader_pkh, 1)
 
   let pos_out =
     Output {
@@ -288,10 +285,11 @@ test mint() {
       asset_name,
       staking_policy_id: strike_collateral_policy_id,
       staking_asset_name: strike_collateral_asset_name,
-      stake_credential,
+      stake_credential: stake_credential_pkh,
     }
-  let redeemer = Mint
-  staking.mint(params, redeemer, policy_id, tx)
+
+  let redeemer = Mint(1)
+  staking.mint(params, redeemer, mint_policy_id, tx)
 }
 
 test add_stake() {
@@ -304,13 +302,13 @@ test add_stake() {
   let stake_datum =
     StakingDatum {
       owner_address_hash: trader_pkh,
-      mint_asset,
-      staking_asset: strike_collateral_asset,
       staked_at: 1727453227631,
+      mint_policy_id,
     }
 
-  let mint = assets.from_asset(policy_id, asset_name, 1)
-  let staker_identifier_mint_sent = assets.from_asset(policy_id, trader_pkh, 1)
+  let mint = assets.from_asset(mint_policy_id, asset_name, 1)
+  let staker_identifier_mint_sent =
+    assets.from_asset(mint_policy_id, trader_pkh, 1)
 
   let staking_sent =
     assets.from_asset(
@@ -379,7 +377,7 @@ test add_stake() {
       asset_name,
       staking_policy_id: strike_collateral_policy_id,
       staking_asset_name: strike_collateral_asset_name,
-      stake_credential,
+      stake_credential: stake_credential_pkh,
     }
   let redeemer = AddStakeOrConsumeStakingRewards
   staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
@@ -395,13 +393,13 @@ test consume_rewards() {
   let stake_datum =
     StakingDatum {
       owner_address_hash: trader_pkh,
-      mint_asset,
-      staking_asset: strike_collateral_asset,
       staked_at: 1727453227631,
+      mint_policy_id,
     }
 
-  let mint = assets.from_asset(policy_id, asset_name, 1)
-  let staker_identifier_mint_sent = assets.from_asset(policy_id, trader_pkh, 1)
+  let mint = assets.from_asset(mint_policy_id, asset_name, 1)
+  let staker_identifier_mint_sent =
+    assets.from_asset(mint_policy_id, trader_pkh, 1)
   let staking_sent =
     assets.from_asset(
       strike_collateral_asset.policy_id,
@@ -469,7 +467,7 @@ test consume_rewards() {
       asset_name,
       staking_policy_id: strike_collateral_policy_id,
       staking_asset_name: strike_collateral_asset_name,
-      stake_credential,
+      stake_credential: stake_credential_pkh,
     }
   let redeemer = AddStakeOrConsumeStakingRewards
   staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
@@ -485,17 +483,17 @@ test withdraw_stake() {
   let stake_datum =
     StakingDatum {
       owner_address_hash: trader_pkh,
-      mint_asset,
-      staking_asset: strike_collateral_asset,
+      mint_policy_id,
       staked_at: 1727453227631,
     }
 
-  let mint = assets.from_asset(policy_id, asset_name, 1)
-  let staker_identifier_mint_sent = assets.from_asset(policy_id, trader_pkh, 1)
+  let mint = assets.from_asset(mint_policy_id, asset_name, 1)
+  let staker_identifier_mint_sent =
+    assets.from_asset(mint_policy_id, trader_pkh, 1)
 
-  let burnt_mint = assets.from_asset(policy_id, asset_name, -1)
+  let burnt_mint = assets.from_asset(mint_policy_id, asset_name, -1)
   let staker_identifier_mint_burnt =
-    assets.from_asset(policy_id, trader_pkh, -1)
+    assets.from_asset(mint_policy_id, trader_pkh, -1)
 
   let staking_sent =
     assets.from_asset(
@@ -562,7 +560,7 @@ test withdraw_stake() {
       asset_name,
       staking_policy_id: strike_collateral_policy_id,
       staking_asset_name: strike_collateral_asset_name,
-      stake_credential,
+      stake_credential: stake_credential_pkh,
     }
   let redeemer = WithdrawStake
   staking.spend(params, Some(stake_datum), redeemer, own_ref, tx)
@@ -578,13 +576,13 @@ test prop_withdraw_validator() {
   let stake_datum =
     StakingDatum {
       owner_address_hash: trader_pkh,
-      mint_asset,
-      staking_asset: strike_collateral_asset,
+      mint_policy_id,
       staked_at: 1727453227631,
     }
 
-  let mint = assets.from_asset(policy_id, asset_name, 1)
-  let staker_identifier_mint_sent = assets.from_asset(policy_id, trader_pkh, 1)
+  let mint = assets.from_asset(mint_policy_id, asset_name, 1)
+  let staker_identifier_mint_sent =
+    assets.from_asset(mint_policy_id, trader_pkh, 1)
 
   let staking_sent =
     assets.from_asset(
@@ -654,7 +652,7 @@ test prop_withdraw_validator() {
       asset_name,
       staking_policy_id: strike_collateral_policy_id,
       staking_asset_name: strike_collateral_asset_name,
-      stake_credential,
+      stake_credential: stake_credential_pkh,
     }
   staking.withdraw(params, redeemer, stake_script_credential, tx)
 }
