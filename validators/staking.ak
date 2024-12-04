@@ -3,7 +3,7 @@ use aiken/collection/list
 use aiken/collection/pairs
 use aiken/interval.{Finite, Interval, IntervalBound}
 use cardano/address.{Address, Credential, Script}
-use cardano/assets.{PolicyId, lovelace_of, match, quantity_of}
+use cardano/assets.{PolicyId, flatten, lovelace_of, match, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, find_input,
   find_script_outputs,
@@ -67,27 +67,28 @@ validator staking(params: StakingParams) {
         let return_min_lovelace_valid =
           lovelace_of(output_to_validator.value) >= min_lovelace_in_utxo
 
-        let quantity_of_staking_asset_in_input =
+        let stake_asset_present =
           quantity_of(
-            input_from_validator.output.value,
+            output_to_validator.value,
             params.staking_policy_id,
             params.staking_asset_name,
-          )
+          ) >= 1
 
-        let expected_assets_locked =
-          assets.from_lovelace(min_lovelace_in_utxo)
-            |> assets.add(
-                params.staking_policy_id,
-                params.staking_asset_name,
-                quantity_of_staking_asset_in_input,
-              )
-            |> assets.add(datum.mint_policy_id, params.asset_name, 1)
-            |> assets.add(datum.mint_policy_id, datum.owner_address_hash, 1)
+        let mint_asset_present =
+          quantity_of(
+            output_to_validator.value,
+            datum.mint_policy_id,
+            params.asset_name,
+          ) == 1
 
-        let assets_match =
-          match(output_to_validator.value, expected_assets_locked, >=)
+        let owner_asset_present =
+          quantity_of(
+            output_to_validator.value,
+            datum.mint_policy_id,
+            datum.owner_address_hash,
+          ) == 1
 
-        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && assets_match
+        signed_by_owner && stake_credential_is_valid && only_one_validator_input && datum_valid && return_min_lovelace_valid && stake_asset_present && mint_asset_present && owner_asset_present
       }
       WithdrawStake -> {
         expect Some(datum) = datum
@@ -95,10 +96,12 @@ validator staking(params: StakingParams) {
           list.has(transaction.extra_signatories, datum.owner_address_hash)
 
         let expected_assets_burnt =
-          assets.from_asset(datum.mint_policy_id, params.asset_name, -1)
-            |> assets.add(datum.mint_policy_id, datum.owner_address_hash, -1)
+          [
+            (datum.mint_policy_id, params.asset_name, -1),
+            (datum.mint_policy_id, datum.owner_address_hash, -1),
+          ]
 
-        let valid_mint = expected_assets_burnt == transaction.mint
+        let valid_mint = expected_assets_burnt == flatten(transaction.mint)
 
         signed_by_owner && valid_mint
       }
@@ -129,9 +132,6 @@ validator staking(params: StakingParams) {
         redeemer,
         own_validator,
         transaction,
-        params.asset_name,
-        params.staking_policy_id,
-        params.staking_asset_name,
       )
 
     valid_distribute && admin_signed
@@ -151,10 +151,12 @@ validator staking(params: StakingParams) {
         expect output_datum_typed: StakingDatum = output_datum
 
         let expected_assets_minted =
-          assets.from_asset(policy_id, params.asset_name, 1)
-            |> assets.add(policy_id, output_datum_typed.owner_address_hash, 1)
+          [
+            (policy_id, params.asset_name, 1),
+            (policy_id, output_datum_typed.owner_address_hash, 1),
+          ]
 
-        let valid_mint = expected_assets_minted == transaction.mint
+        let valid_mint = expected_assets_minted == flatten(transaction.mint)
 
         let output_script_hash =
           get_script_hash(output_to_forward_contract.address)
@@ -201,12 +203,13 @@ validator staking(params: StakingParams) {
         output_is_to_forward_validator && signed_by_owner && stake_credential_is_valid && valid_mint && min_lovelace_in_output && last_rewarded_time_is_valid && asset_is_valid && assets_match
       }
 
-      Burn(asset_name, owner_address_hash) -> {
-        let expected_burnt =
-          assets.from_asset(policy_id, asset_name, -1)
-            |> assets.add(policy_id, owner_address_hash, -1)
-
-        let valid_mint = expected_burnt == transaction.mint
+      Burn(owner_address_hash) -> {
+        let expected_mint =
+          [
+            (policy_id, params.asset_name, -1),
+            (policy_id, owner_address_hash, -1),
+          ]
+        let valid_mint = expected_mint == flatten(transaction.mint)
 
         valid_mint
       }
